@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ka"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TSQ Style</title><style>
+*{box-sizing:border-box}body{margin:0;background:#000;color:#fff;font-family:Arial,sans-serif}
+.app{max-width:430px;min-height:100vh;margin:auto;background:#0b0b0b;padding:20px 18px 36px}
+.brand{font-size:28px;font-weight:800;margin:4px 0 22px}.brand b{color:#b944df}
+.panel{background:linear-gradient(135deg,#a62fd0,#d44be8);border-radius:18px;padding:20px;margin-bottom:14px}
+.small{font-size:14px;opacity:.86}.amount{font-size:38px;font-weight:800;margin:7px 0 4px}
+.card{background:#1c1c1f;border-radius:16px;padding:17px;margin:12px 0}.card h3{margin:0 0 9px;font-size:14px;color:#ddd;font-weight:500}
+.big{font-size:25px;font-weight:750}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input{width:100%;background:#29292c;border:1px solid #3a3a3d;color:white;border-radius:12px;padding:13px;margin:5px 0}
+button{border:0;border-radius:12px;padding:14px;font-weight:700;font-size:15px;cursor:pointer;margin-top:7px}.primary{background:#b83bd8;color:#fff}.dark{background:#29292c;color:#fff}.full{width:100%}
+#auth{display:none}.tabs{display:flex;gap:8px;margin-bottom:12px}.tabs button{flex:1}.hidden{display:none!important}.msg{font-size:13px;color:#bbb;margin:8px 0}
+table{width:100%;border-collapse:collapse;font-size:12px}td{padding:8px 3px;border-bottom:1px solid #333}
+</style></head>
+<body><div class="app">
+<div class="brand">TSQ <b>•</b></div>
+
+<section id="auth">
+ <div class="tabs"><button class="primary" onclick="showLogin()">შესვლა</button><button class="dark" onclick="showRegister()">რეგისტრაცია</button></div>
+ <div id="login"><div class="card"><h3>შესვლა</h3><input id="le" placeholder="ელფოსტა"><input id="lp" type="password" placeholder="პაროლი"><button class="primary full" onclick="login()">შესვლა</button><div id="lm" class="msg"></div></div></div>
+ <div id="register" class="hidden"><div class="card"><h3>რეგისტრაცია</h3><input id="rn" placeholder="სახელი"><input id="re" placeholder="ელფოსტა"><input id="rp" type="password" placeholder="პაროლი"><input id="rr" placeholder="Referral კოდი (არასავალდებულო)"><button class="primary full" onclick="register()">ანგარიშის შექმნა</button><div id="rm" class="msg"></div></div></div>
+</section>
+
+<section id="dash" class="hidden">
+ <div class="panel"><div class="small">ანგარიშის მთლიანი აქტივები</div><div class="amount" id="bal">$0.00</div><div class="small">დადასტურებული ბალანსი</div></div>
+ <div class="card"><h3>მომხმარებელი</h3><div class="big" id="name"></div><div class="small" id="email"></div></div>
+ <div class="grid"><div class="card"><h3>სპოტ ბალანსი</h3><div class="big">$0.00</div></div><div class="card"><h3>რეფერალი</h3><div class="big" id="rcode">—</div></div></div>
+ <div class="card"><h3>Referral ლინკი</h3><input id="rlink" readonly><button class="dark full" onclick="copyLink()">კოპირება</button></div>
+ <div class="grid"><button class="primary" onclick="withdraw()">თანხის გატანა</button><button class="dark" onclick="alert('დეპოზიტის რეალური ინტეგრაცია უნდა დაემატოს გადახდის პროვაიდერთან.')">თანხის დამატება</button></div>
+ <div class="card"><h3>ტრანზაქციები</h3><table><tbody id="tx"></tbody></table></div>
+ <button class="dark full" onclick="logout()">გასვლა</button>
+</section>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+function showLogin(){$("login").classList.remove("hidden");$("register").classList.add("hidden")}
+function showRegister(){$("login").classList.add("hidden");$("register").classList.remove("hidden")}
+async function api(url,opt={}){let r=await fetch(url,{...opt,headers:{"Content-Type":"application/json",...(opt.headers||{})}});let d=await r.json();if(!r.ok)throw Error(d.error||"შეცდომა");return d}
+async function login(){try{await api("/api/login",{method:"POST",body:JSON.stringify({email:$("le").value,password:$("lp").value})});load()}catch(e){$("lm").textContent=e.message}}
+async function register(){try{await api("/api/register",{method:"POST",body:JSON.stringify({name:$("rn").value,email:$("re").value,password:$("rp").value,referral:$("rr").value})});load()}catch(e){$("rm").textContent=e.message}}
+async function load(){try{let u=await api("/api/me");$("auth").classList.add("hidden");$("dash").classList.remove("hidden");$("bal").textContent="$"+u.balance.toFixed(2);$("name").textContent=u.name;$("email").textContent=u.email;$("rcode").textContent=u.referral_code;$("rlink").value=u.referralLink;let tx=await api("/api/transactions");$("tx").innerHTML=tx.length?tx.map(x=>`<tr><td>${x.type==="deposit"?"დამატება":"გატანა"}</td><td>$${Number(x.amount).toFixed(2)}</td><td>${x.status}</td></tr>`).join(""):"<tr><td colspan=3>ტრანზაქციები ჯერ არ არის</td></tr>"}catch(e){$("auth").style.display="block"}}
+async function logout(){await api("/api/logout",{method:"POST"});location.reload()}
+function copyLink(){navigator.clipboard.writeText($("rlink").value);alert("დაკოპირდა")}
+async function withdraw(){let a=prompt("რამდენის გატანა გინდა?");if(!a)return;try{let d=await api("/api/withdraw",{method:"POST",body:JSON.stringify({amount:Number(a)})});alert(d.message);load()}catch(e){alert(e.message)}}
+load();
+</script></body></html>
